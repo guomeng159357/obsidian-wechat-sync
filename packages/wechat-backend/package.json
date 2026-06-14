@@ -1,0 +1,27 @@
+{
+  "name": "@obsidian-wechat-sync/wechat-backend",
+  "version": "1.0.0",
+  "private": true,
+  "description": "微信公众号后端服务 — 接收微信消息写入本地收件箱",
+  "type": "module",
+  "scripts": {
+    "dev": "tsx src/server.ts",
+    "build": "tsc",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@obsidian-wechat-sync/shared": "*",
+    "express": "^5.1.0",
+    "xml2js": "^0.6.0",
+    "uuid": "^9.0.0",
+    "ngrok": "^4.3.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.0",
+    "tsx": "^4.7.0",
+    "@types/express": "^5.0.0",
+    "@types/xml2js": "^0.4.0",
+    "@types/node": "^20.11.0",
+    "@types/uuid": "^9.0.0"
+  }
+}

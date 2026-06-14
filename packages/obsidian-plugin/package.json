@@ -1,0 +1,25 @@
+{
+  "name": "@obsidian-wechat-sync/obsidian-plugin",
+  "version": "1.0.0",
+  "private": true,
+  "description": "微信内容同步到 Obsidian 插件",
+  "main": "main.js",
+  "scripts": {
+    "dev": "node esbuild.config.mjs",
+    "build": "tsc -noEmit -skipLibCheck && node esbuild.config.mjs production",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@obsidian-wechat-sync/shared": "*",
+    "chokidar": "^4.0.0",
+    "turndown": "^7.1.0",
+    "@joplin/turndown-plugin-gfm": "^1.0.0",
+    "uuid": "^9.0.0"
+  },
+  "devDependencies": {
+    "obsidian": "latest",
+    "esbuild": "^0.20.0",
+    "typescript": "^5.4.0",
+    "@types/node": "^20.11.0"
+  }
+}

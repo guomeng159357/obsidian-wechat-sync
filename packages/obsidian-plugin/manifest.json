@@ -1,0 +1,10 @@
+{
+  "id": "wechat-inbox-sync",
+  "name": "WeChat Inbox Sync",
+  "version": "1.0.0",
+  "minAppVersion": "1.5.0",
+  "description": "从本地收件箱同步微信内容到 Obsidian vault",
+  "author": "Your Name",
+  "authorUrl": "",
+  "isDesktopOnly": true
+}

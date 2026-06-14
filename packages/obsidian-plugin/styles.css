@@ -1,0 +1,16 @@
+.wechat-sync-status-bar {
+  cursor: pointer;
+  padding: 0 8px;
+}
+
+.wechat-sync-status-bar.syncing {
+  color: var(--text-accent);
+}
+
+.wechat-sync-status-bar.idle {
+  color: var(--text-muted);
+}
+
+.wechat-sync-status-bar.error {
+  color: var(--text-error);
+}

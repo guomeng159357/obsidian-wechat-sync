@@ -1,0 +1,14 @@
+node_modules/
+dist/
+*.js.map
+*.d.ts.map
+.env
+.DS_Store
+cloudflared
+.claude/
+sample-inbox/pending/*
+sample-inbox/processing/*
+sample-inbox/done/*
+sample-inbox/failed/*
+sample-inbox/attachments/*
+!sample-inbox/*/.gitkeep

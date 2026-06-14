@@ -1,0 +1,23 @@
+{
+  "name": "obsidian-wechat-sync",
+  "version": "1.0.0",
+  "private": true,
+  "description": "微信内容同步到 Obsidian",
+  "workspaces": [
+    "packages/shared",
+    "packages/obsidian-plugin",
+    "packages/inbox-simulator",
+    "packages/wechat-backend"
+  ],
+  "scripts": {
+    "build": "npm run build --workspaces",
+    "lint": "eslint packages/*/src --ext .ts",
+    "typecheck": "tsc --noEmit -p packages/shared && tsc --noEmit -p packages/obsidian-plugin && tsc --noEmit -p packages/inbox-simulator"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "@types/turndown": "^5.0.6",
+    "@types/uuid": "^10.0.0",
+    "typescript": "^5.4.0"
+  }
+}
