@@ -44,30 +44,32 @@ export class ArticleProcessor implements ContentProcessor {
         publishDate = publishDate || fetched.publishDate;
       } catch (error) {
         console.error("抓取文章失败:", error);
-        return this.createLinkFallback(record);
+        const errMsg = error instanceof Error ? error.message : String(error);
+        return this.createLinkFallback(record, errMsg);
       }
     }
 
     // HTML 转 Markdown
     let markdown = htmlContent ? this.htmlConverter.convert(htmlContent) : `> 原文链接: [${title || content.url}](${content.url})`;
 
-    // 下载文章内图片
-    if (content.images && content.images.length > 0) {
-      const dateFolder = formatDateFolder(new Date(record.timestamp));
-      const imageFolder = `${this.attachmentsFolder}/${dateFolder}`;
-      for (const img of content.images) {
+    // 从 Markdown 中提取远程图片并下载，替换为本地嵌入
+    const dateFolder = formatDateFolder(new Date(record.timestamp));
+    const imageFolder = `${this.attachmentsFolder}/${dateFolder}`;
+    const remoteImages = this.extractMarkdownImages(markdown);
+
+    if (remoteImages.length > 0) {
+      const downloads = remoteImages.map(async ({ fullMatch, remoteUrl }) => {
         try {
-          const localPath = await this.attachmentCopier.downloadImage(img.originalUrl, imageFolder);
+          const localPath = await this.attachmentCopier.downloadImage(remoteUrl, imageFolder);
           const fileName = localPath.split("/").pop() || "";
-          markdown = markdown.replace(
-            new RegExp(`!\\[.*?\\]\\(${this.escapeRegex(img.originalUrl)}\\)`, "g"),
-            `![[${fileName}]]`
-          );
+          // 替换为 Obsidian 嵌入格式（![[文件名]]）
+          markdown = markdown.split(fullMatch).join(`![[${fileName}]]`);
           files.push(localPath);
         } catch (error) {
-          console.error(`下载图片失败 ${img.originalUrl}:`, error);
+          console.error(`下载图片失败 ${remoteUrl}:`, error);
         }
-      }
+      });
+      await Promise.all(downloads);
     }
 
     const vars: TemplateVars = {
@@ -93,14 +95,32 @@ export class ArticleProcessor implements ContentProcessor {
     return files;
   }
 
-  private async createLinkFallback(record: InboxRecord): Promise<string[]> {
+  /**
+   * 从 Markdown 中提取所有远程图片引用
+   */
+  private extractMarkdownImages(markdown: string): Array<{ fullMatch: string; remoteUrl: string }> {
+    const results: Array<{ fullMatch: string; remoteUrl: string }> = [];
+    const imgRe = /!\[([^\]]*)\]\((https?:\/\/[^)]+)\)/g;
+    let match;
+    while ((match = imgRe.exec(markdown)) !== null) {
+      const remoteUrl = match[2];
+      // 过滤 SVG 占位图
+      if (!remoteUrl.includes("wx_fmt=svg")) {
+        results.push({ fullMatch: match[0], remoteUrl });
+      }
+    }
+    return results;
+  }
+
+  private async createLinkFallback(record: InboxRecord, errorMsg?: string): Promise<string[]> {
     const content = record.content as ArticleContent;
     const title = content.title || "未命名文章";
+    const errorNote = errorMsg ? `\n\n> 错误信息: ${errorMsg}` : "";
 
     const vars: TemplateVars = {
       title,
       date: new Date().toISOString().slice(0, 10),
-      content: `> 原文链接: [${title}](${content.url})\n\n文章内容抓取失败，请手动查看原文。`,
+      content: `> 原文链接: [${title}](${content.url})\n\n文章内容抓取失败，请手动查看原文。${errorNote}`,
       sender: record.source.sender || "",
       tags: this.defaultTags.join(", "),
       url: content.url,
@@ -115,9 +135,5 @@ export class ArticleProcessor implements ContentProcessor {
     );
 
     return [file.path];
-  }
-
-  private escapeRegex(str: string): string {
-    return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   }
 }

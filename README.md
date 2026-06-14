@@ -1,6 +1,6 @@
 # Obsidian 微信内容同步助手
 
-从微信公众号同步内容到 Obsidian vault 的完整工具链。
+从微信同步内容到 Obsidian vault 的完整工具链。
 
 ## 项目概述
 
@@ -14,10 +14,63 @@
             cloudflared 隧道          文件系统监听/轮询
 ```
 
+## 安装指南
+
+### 1. 克隆仓库
+
+```bash
+git clone https://github.com/guomeng159357/obsidian-wechat-sync.git
+cd obsidian-wechat-sync
+npm install
+```
+
+### 2. 构建 Obsidian 插件
+
+```bash
+cd packages/obsidian-plugin
+node esbuild.config.mjs production
+```
+
+### 3. 安装插件到 Obsidian
+
+将以下三个文件复制到你的 Obsidian vault 插件目录：
+
+```bash
+# macOS
+cp main.js manifest.json styles.css \
+  "/Users/你的用户名/Library/CloudStorage/坚果云-xxx/我的坚果云/Obsidian仓库/.obsidian/plugins/wechat-inbox-sync/"
+
+# Windows
+copy main.js manifest.json styles.css \
+  "C:\Users\你的用户名\Documents\Obsidian\你的仓库\.obsidian\plugins\wechat-inbox-sync\"
+```
+
+### 4. 在 Obsidian 中启用
+
+1. 打开 Obsidian → 设置 → 第三方插件
+2. 关闭"安全模式"
+3. 找到"微信内容同步助手"，点击启用
+4. 进入插件设置，配置**收件箱路径**（见下方说明）
+
+### 5. 配置收件箱路径
+
+插件需要一个本地文件夹作为收件箱。开发调试可直接使用项目自带的 `sample-inbox`：
+
+| 配置项 | 推荐值 |
+|--------|--------|
+| 收件箱路径 | `/你的路径/obsidian-wechat-sync/sample-inbox` |
+| 输出文件夹 | `WeChat` |
+| 附件文件夹 | `WeChat/attachments` |
+| 默认标签 | `wechat` |
+
+### 6. （可选）接入微信公众号
+
+参照下方 [部署操作](#部署操作) 章节，启动后端服务和内网穿透，配置微信测试号即可。
+
 ## 项目目录结构
 
 ```
-Obsidian内容同步助手/
+obsidian-wechat-sync/
 ├── packages/
 │   ├── shared/src/                 # 共享类型和工具
 │   │   ├── types.ts                # InboxRecord、ContentType 等类型定义
@@ -85,11 +138,32 @@ pending/ ──(检测到)──▶ processing/ ──(成功)──▶ done/
 
 ## 功能特性
 
-### 已实现
+### 文字/链接处理
 
-- 文字/链接同步，自动提取 URL
-- 公众号文章抓取 + HTML 转 Markdown
-- 图片/文件复制到 vault 附件目录，图片用 `![[]]` 嵌入
+- 微信文本自动转为 Markdown 格式
+- 中文数字序号（`一、` `二、` … `十一、`）→ `##` 二级标题
+- 序数标题（`第一、` `第2、` `第1）`）→ `##` 二级标题
+- 阿拉伯数字（`1.` `2、` `3）`）→ Markdown 有序列表
+- 自然段自动首行缩进（两个全角空格 `　　`）
+- 自动过滤微信转载混入的元数据噪音行（"原创"、"星标"、日期、位置、公众号名等）
+- 提取第一个标题作为笔记文件名
+- 附加链接列表（如有）
+
+### 公众号文章处理
+
+- HTML 内容自动转为 Markdown（基于 turndown）
+- 仅 URL 时自动抓取网页内容
+- 文章内图片自动下载并嵌入为 `![[本地文件名]]`
+- 提取作者、发布时间等元数据写入 frontmatter
+
+### 图片/文件处理
+
+- 附件复制到 vault 附件目录
+- 图片用 Obsidian 原生 `![[文件名]]` 嵌入
+- frontmatter 记录 fileType、fileSize 等元数据
+
+### 通用特性
+
 - 三种内容类型的**自定义笔记模板**（在插件设置中编辑）
 - 按日期文件夹自动归档（如 `WeChat/2026-06-14/`）
 - **手动同步**和**自动定时同步**（可开关）
@@ -124,18 +198,22 @@ pending/ ──(检测到)──▶ processing/ ──(成功)──▶ done/
 6. **esbuild 中文问题** — 漏加 `charset: "utf8"` 导致中文界面消失，已修复
 7. **自动同步** — 添加可手动开关的定时同步功能
 8. **微信后端服务** — Express + xml2js，支持文本/链接/文章消息
-9. **内网穿透** — 尝试 ngrok（npm 包 macOS 兼容问题）→ Homebrew ngrok（免费版拦截）→ cloudflared（成功）
-10. **Token 调试** — 环境变量未 export 导致使用默认值 `your_token_here`，修复后签名验证通过
-11. **端到端验证** — 微信测试号发消息 → Obsidian 出现笔记，全链路打通
+9. **内网穿透** — 尝试 ngrok → Homebrew ngrok → cloudflared（成功）
+10. **端到端验证** — 微信测试号发消息 → Obsidian 出现笔记，全链路打通
+11. **文章内容抓取修复** — 用深度追踪解析嵌套 div 提取正文，JS 变量提取元数据，Obsidian `requestUrl` API 替代 `fetch`
+12. **图片下载嵌入** — 先 HTML→MD 再提取远程图片 URL 下载替换为 `![[本地名]]`
+13. **文本格式化** — 中文序号→标题、微信噪音过滤、段落缩进
 
 ### 踩过的坑
 
-1. **esbuild 默认 charset=ascii**，中文设置面板文字会消失，需要显式设置 `charset: "utf8"`
-2. **环境变量在 npm scripts 中需要用 `export`**，`INLINE=xxx cmd` 方式只在命令作用域有效，`export` 后子进程才能继承
-3. **ngrok npm 包在 macOS Node 24 有 spawn 错误**，改用 Homebrew 安装独立二进制
-4. **ngrok 免费版有浏览器确认页面**，会拦截微信服务器请求，改用 cloudflared
-5. **cloudflared 下载速度慢**，GitHub 连接不稳定，需耐心等待
-6. **Obsidian 插件访问外部文件系统**，需要用 `require("fs")` 而非 `vault.adapter`（后者只能访问 vault 内部）
+1. **esbuild 默认 charset=ascii** — 中文设置面板文字消失，需显式 `charset: "utf8"`
+2. **环境变量作用域** — `INLINE=xxx cmd` 只在命令作用域有效，`export` 后子进程才能继承
+3. **ngrok npm 包兼容性** — macOS Node 24 有 spawn 错误，改用 Homebrew；免费版截断微信请求，最终用 cloudflared
+4. **Obsidian 文件系统访问** — 用 `require("fs")` 而非 `vault.adapter`（后者仅限 vault 内部）
+5. **微信文章嵌套 div 解析** — 非贪婪正则 `([\s\S]*?)` 在嵌套结构中提前终止，改用深度追踪算法
+6. **微信图片懒加载** — 图片 URL 在 `data-src` 属性而非 `src`，HTML→MD 转换需优先检查
+7. **图片替换 URL 不匹配** — HTML 属性值经过 HTML 实体解码后与 Markdown 输出不一致，改为从 MD 中提取 URL
+8. **中文序号捕获组嵌套** — CN_NUM_RE 内部捕获组导致 `cnMatch[2]` 取到序号而非内容，改为非捕获组 `(?:…)`
 
 ## 部署操作
 
@@ -151,7 +229,7 @@ pending/ ──(检测到)──▶ processing/ ──(成功)──▶ done/
 #### 1. 安装依赖
 
 ```bash
-cd Obsidian内容同步助手
+cd obsidian-wechat-sync
 npm install
 ```
 
@@ -160,7 +238,7 @@ npm install
 ```bash
 cd packages/obsidian-plugin
 node esbuild.config.mjs production
-# 将 main.js、manifest.json、styles.css 复制到 vault 的 .obsidian/plugins/wechat-inbox-sync/
+# 将 main.js、manifest.json、styles.css 复制到 vault 插件目录
 ```
 
 #### 3. 启动后端服务（终端 1）
@@ -186,12 +264,12 @@ cloudflared tunnel --url http://localhost:3000
 - 接口配置信息：
   - URL：`https://xxxx.trycloudflare.com/wechat`
   - Token：与步骤 3 中 `WECHAT_TOKEN` 一致
-- 点击提交，验证通过后会显示"配置成功"
+- 点击提交，验证通过后显示"配置成功"
 
 #### 6. 配置 Obsidian 插件
 
-- 打开 Obsidian → 设置 → 第三方插件 → WeChat Inbox Sync
-- **收件箱路径**：`/Users/ammon/Desktop/项目/Obsidian内容同步助手/sample-inbox`
+- 打开 Obsidian → 设置 → 第三方插件 → 微信内容同步助手
+- **收件箱路径**：`/你的路径/obsidian-wechat-sync/sample-inbox`
 - **启用自动同步**：按需开启
 - **自动同步间隔**：默认 60 秒
 - **笔记模板**：三个编辑器可按需修改
@@ -200,8 +278,7 @@ cloudflared tunnel --url http://localhost:3000
 
 ```bash
 # 跳过微信，用模拟器直接发送内容到收件箱
-cd Obsidian内容同步助手
-export WECHAT_SYNC_INBOX=./sample-inbox
+cd obsidian-wechat-sync
 
 # 发送文字
 npx tsx packages/inbox-simulator/src/cli.ts text "测试内容" --sender "张三"

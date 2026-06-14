@@ -3,6 +3,36 @@ import { writeRecord } from "../record-writer.js";
 import { v4 as uuidv4 } from "uuid";
 
 /**
+ * 提取指定 ID 的 div 内容，正确处理嵌套
+ */
+function extractNestedDiv(html: string, targetId: string): string | null {
+  const startPattern = new RegExp(`<div[^>]*id="${targetId}"[^>]*>`);
+  const startMatch = html.match(startPattern);
+  if (!startMatch || startMatch.index === undefined) return null;
+  const startPos = startMatch.index + startMatch[0].length;
+  let depth = 1;
+  let pos = startPos;
+  const divOpenRe = /<div[\s>]/gi;
+  const divCloseRe = /<\/div>/gi;
+  while (depth > 0 && pos < html.length) {
+    divOpenRe.lastIndex = pos;
+    divCloseRe.lastIndex = pos;
+    const openMatch = divOpenRe.exec(html);
+    const closeMatch = divCloseRe.exec(html);
+    if (!closeMatch) break;
+    if (openMatch && openMatch.index < closeMatch.index) {
+      depth++;
+      pos = html.indexOf(">", openMatch.index) + 1;
+    } else {
+      depth--;
+      if (depth === 0) return html.slice(startPos, closeMatch.index).trim();
+      pos = closeMatch.index + closeMatch[0].length;
+    }
+  }
+  return null;
+}
+
+/**
  * 抓取文章内容（简化版，用于模拟器）
  */
 async function fetchArticle(url: string): Promise<{
@@ -25,36 +55,45 @@ async function fetchArticle(url: string): Promise<{
 
     const html = await response.text();
 
-    // 提取标题
+    // 提取标题（优先微信 JS 变量）
     let title = "未命名文章";
-    const ogTitle = html.match(/<meta[^>]+property="og:title"[^>]+content="([^"]*)"/i);
-    if (ogTitle) {
-      title = ogTitle[1].replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"');
+    const msgTitle = html.match(/var\s+msg_title\s*=\s*'([^']*)'/);
+    if (msgTitle) {
+      title = msgTitle[1];
     } else {
-      const titleMatch = html.match(/<title>([^<]*)<\/title>/i);
-      if (titleMatch) title = titleMatch[1].trim();
+      const ogTitle = html.match(/<meta[^>]+property="og:title"[^>]+content="([^"]*)"/i);
+      if (ogTitle) title = ogTitle[1].replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"');
+      else {
+        const titleMatch = html.match(/<title>([^<]*)<\/title>/i);
+        if (titleMatch) title = titleMatch[1].trim();
+      }
     }
 
     // 提取作者
     let author = "";
-    const authorMatch = html.match(/var\s+nickname\s*=\s*"([^"]*)"/i) || html.match(/nickname\s*=\s*"([^"]*)"/i);
+    const authorMatch = html.match(/var\s+nickname\s*=\s*htmlDecode\("([^"]*)"\)/i) || html.match(/nickname\s*=\s*htmlDecode\("([^"]*)"\)/i);
     if (authorMatch) author = authorMatch[1];
 
     // 提取发布日期
     let publishDate = new Date().toISOString().slice(0, 10);
-    const dateMatch = html.match(/var\s+createTime\s*=\s*'(\d+)'/i);
-    if (dateMatch) {
-      const ts = parseInt(dateMatch[1], 10) * 1000;
-      publishDate = new Date(ts).toISOString().slice(0, 10);
+    const createTime = html.match(/var\s+createTime\s*=\s*'([^']*)'/i);
+    if (createTime) {
+      const dt = new Date(createTime[1]);
+      if (!isNaN(dt.getTime())) publishDate = dt.toISOString().slice(0, 10);
+    } else {
+      const dateMatch = html.match(/var\s+createTime\s*=\s*'(\d+)'/i);
+      if (dateMatch) {
+        const ts = parseInt(dateMatch[1], 10) * 1000;
+        publishDate = new Date(ts).toISOString().slice(0, 10);
+      }
     }
 
-    // 提取正文（微信公众号专用）
+    // 提取正文（正确处理嵌套 div）
     let content = html;
-    const wxContent = html.match(/<div[^>]*id="js_content"[^>]*>([\s\S]*?)<\/div>/i);
+    const wxContent = extractNestedDiv(html, "js_content");
     if (wxContent) {
-      content = wxContent[1];
+      content = wxContent;
     } else {
-      // 尝试通用正文提取
       const articleMatch = html.match(/<article[^>]*>([\s\S]*?)<\/article>/i);
       if (articleMatch) content = articleMatch[1];
     }

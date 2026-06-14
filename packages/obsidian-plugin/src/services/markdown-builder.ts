@@ -71,8 +71,8 @@ export class MarkdownBuilder {
    * 从文本中提取标题（取前 N 个字符）
    */
   extractTitle(text: string, maxLen = 50): string {
-    const firstLine = text.replace(/\n/g, " ").trim();
-    if (firstLine.length <= maxLen) return firstLine;
-    return firstLine.slice(0, maxLen) + "...";
+    const cleaned = text.replace(/\s+/g, " ").trim();
+    if (cleaned.length <= maxLen) return cleaned;
+    return cleaned.slice(0, maxLen) + "...";
   }
 }

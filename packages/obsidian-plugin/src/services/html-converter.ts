@@ -36,12 +36,14 @@ export class HtmlConverter {
       },
     });
 
-    // 自定义规则：处理图片
+    // 自定义规则：处理图片（微信使用 data-src 懒加载）
     this.turndown.addRule("obsidianImage", {
       filter: "img",
       replacement: (_content, node) => {
         const img = node as HTMLImageElement;
-        const src = img.getAttribute("src") || "";
+        // 微信文章图片 URL 在 data-src 中，src 通常为空或占位图
+        const src = img.getAttribute("data-src") || img.getAttribute("src") || "";
+        if (!src) return ""; // 无图片源则跳过
         const alt = img.getAttribute("alt") || "图片";
         return `![${alt}](${src})`;
       },
